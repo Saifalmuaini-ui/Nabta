@@ -14,22 +14,33 @@ const isDev = process.env.NODE_ENV !== "production";
 const PUBLIC = ["/login", "/auth"];
 
 /**
- * Per-request Content-Security-Policy with a fresh nonce.
+ * Content-Security-Policy.
  *
- * A nonce is what lets script-src drop 'unsafe-inline'. Next reads the nonce
- * off the CSP header and stamps it onto its own bootstrap scripts, and
- * 'strict-dynamic' lets those scripts load the chunks they need without the
- * policy having to name every one.
+ * This deliberately does NOT use a nonce, and that is worth explaining because
+ * a nonce is the stricter option on paper.
  *
- * Dev needs 'unsafe-eval' (React Refresh compiles in the browser) and a
- * websocket for HMR. Neither is emitted in production.
+ * Next renders most of these pages statically at build time, then emits the
+ * React flight data as inline <script> bodies in that prebuilt HTML. A nonce
+ * minted per request in middleware can never be stamped onto HTML that was
+ * generated hours earlier during the build. The result in production was a
+ * policy naming a nonce that no script carried — and because 'strict-dynamic'
+ * makes the browser ignore 'self', every script was blocked. The page rendered
+ * from server HTML and then sat there: no hydration, no working buttons.
+ *
+ * Note that adding 'unsafe-inline' alongside a nonce does not help either —
+ * CSP3 says a browser ignores 'unsafe-inline' whenever a nonce is present.
+ *
+ * So: 'self' covers the chunk files, 'unsafe-inline' covers Next's inline
+ * bootstrap. The honest trade is that script-src is weaker than a nonce-based
+ * policy would be. Everything else here stays strict, and React escapes
+ * interpolated values by default, so the XSS surface is small.
  */
-function contentSecurityPolicy(nonce: string): string {
+function contentSecurityPolicy(): string {
   const supabaseHost = URL ? new global.URL(URL).host : "*.supabase.co";
 
   return [
     `default-src 'self'`,
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
     // Tailwind ships a stylesheet, but Next injects a few inline style
     // attributes. Style nonces are not plumbed through, so this stays.
     `style-src 'self' 'unsafe-inline'`,
@@ -49,20 +60,12 @@ function contentSecurityPolicy(nonce: string): string {
 }
 
 export async function middleware(request: NextRequest) {
-  const nonce = crypto.randomUUID().replace(/-/g, "");
-  const csp = contentSecurityPolicy(nonce);
-
-  // Next reads x-nonce to stamp its own script tags.
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-nonce", nonce);
-  requestHeaders.set("Content-Security-Policy", csp);
-
-  const nextOptions = { request: { headers: requestHeaders } };
+  const csp = contentSecurityPolicy();
+  const nextOptions = { request };
   let response = NextResponse.next(nextOptions);
 
   const finish = (res: NextResponse) => {
     res.headers.set("Content-Security-Policy", csp);
-    res.headers.set("x-nonce", nonce);
     return res;
   };
 
