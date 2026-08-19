@@ -1,0 +1,57 @@
+{
+  "name": "Nabta, نبتة",
+  "short_name": "Nabta",
+  "description": "Plant, verify with AI, earn points, trade with growers across the UAE.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#faf8f3",
+  "theme_color": "#0e6446",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "id": "/",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": [
+    "productivity",
+    "utilities",
+    "education"
+  ],
+  "shortcuts": [
+    {
+      "name": "Log today's work",
+      "short_name": "Log",
+      "url": "/verify"
+    },
+    {
+      "name": "My plants",
+      "short_name": "Plants",
+      "url": "/plants"
+    }
+  ]
+}

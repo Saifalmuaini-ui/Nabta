@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, "Noto Sans Arabic", sans-serif;
+
+  /* Sand, the ground the whole product stands on */
+  --color-sand-50: #faf8f3;
+  --color-sand-100: #f3efe5;
+  --color-sand-200: #e6dfcf;
+  --color-sand-300: #d5cbb4;
+
+  /* Ink */
+  --color-ink: #16261c;
+  --color-ink-soft: #5c6b61;
+  --color-ink-faint: #8b978f;
+
+  /* Palm, primary */
+  --color-palm-50: #eaf5ef;
+  --color-palm-100: #cfe9db;
+  --color-palm-200: #a5d6be;
+  --color-palm-400: #2e9b72;
+  --color-palm-500: #14805b;
+  --color-palm-600: #0e6446;
+  --color-palm-700: #0a4b35;
+  --color-palm-900: #062b1f;
+
+  /* Gold, rewards, points, achievement */
+  --color-gold-50: #fbf4e3;
+  --color-gold-100: #f5e7c4;
+  --color-gold-400: #d9b66a;
+  --color-gold-500: #c29a44;
+  --color-gold-600: #9c7a2f;
+
+  /* Signal */
+  --color-sky-tag: #2b6cb0;
+  --color-clay: #b4531f;
+  --color-clay-50: #fbeee5;
+
+  --radius-card: 1.25rem;
+
+  --animate-scanline: scanline 2.4s ease-in-out infinite;
+  --animate-pulse-ring: pulse-ring 2s ease-out infinite;
+  --animate-rise: rise 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) both;
+
+  @keyframes scanline {
+    0% {
+      transform: translateY(-4%);
+      opacity: 0;
+    }
+    12% {
+      opacity: 1;
+    }
+    88% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(104%);
+      opacity: 0;
+    }
+  }
+
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.85);
+      opacity: 0.7;
+    }
+    100% {
+      transform: scale(1.6);
+      opacity: 0;
+    }
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-sand-50);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Numbers in stat blocks should line up in columns */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .card {
+    background-color: #fff;
+    border: 1px solid var(--color-sand-200);
+    border-radius: var(--radius-card);
+  }
+}
+
+/* The bottom tab bar overlaps content on phones; keep the last card clear of it */
+.pb-safe {
+  padding-bottom: calc(5.5rem + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 1024px) {
+  .pb-safe {
+    padding-bottom: 3rem;
+  }
+}
