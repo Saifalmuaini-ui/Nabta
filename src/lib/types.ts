@@ -177,6 +177,20 @@ export interface Plant {
   history: { at: number; score: number }[];
   /** Data URL of the first capture, kept as the plant's thumbnail. */
   cover: string;
+
+  /* ── grow cycle ──────────────────────────────────────────────────────────
+   * Points accrue here and are released when the plant is harvested. See
+   * lib/growth.ts for the rules. Optional because records created before the
+   * cycle existed have none, and are treated as a fresh cycle. */
+
+  /** Counted check-ins so far. A capture inside the interval does not count. */
+  checkIns?: number;
+  /** Held, not spendable, until this plant's cycle completes. */
+  pendingPoints?: number;
+  /** When the last counted check-in happened. Drives when the next is due. */
+  lastCheckInAt?: number;
+  /** Cycles this plant has completed, so a perennial can be harvested again. */
+  cyclesCompleted?: number;
 }
 
 export type CheckStatus = "pass" | "warn" | "fail";
@@ -227,6 +241,15 @@ export interface Verification {
   produce?: AiYield;
   /** Lets the UI be honest about whether a real model saw this photo. */
   source?: "ai" | "simulated";
+
+  /** What this capture did to the plant's grow cycle. See lib/growth.ts. */
+  cycle?: {
+    kind: "planted" | "checkin" | "early" | "harvest";
+    pendingDelta: number;
+    released: number;
+    message: string;
+    nextCheckInAt?: number;
+  };
 }
 
 export type ListingKind = "sell" | "trade" | "give";

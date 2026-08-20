@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { ArrowLeft, Camera, Leaf, Sprout, TrendingDown, TrendingUp } from "lucide-react";
 import { Card, DemoNote, Empty, PageHeader, Pill, SectionTitle, cx } from "@/components/ui";
 import RecentActivity from "@/components/RecentActivity";
+import { checkInDue, checkInLabel, totalPending } from "@/lib/growth";
 import { useStore } from "@/lib/store";
 import { useI18n } from "@/lib/i18n";
 import { timeAgo } from "@/lib/format";
@@ -92,6 +93,14 @@ export default function PlantsPage() {
                         {plant.logCount}{" "}
                         {plant.logCount === 1 ? t("plants.photo") : t("plants.photos")}
                       </Pill>
+                      {(plant.pendingPoints ?? 0) > 0 && (
+                        <Pill tone="gold">{plant.pendingPoints} held</Pill>
+                      )}
+                      {checkInDue(plant) ? (
+                        <Pill tone="palm">Check-in due</Pill>
+                      ) : (
+                        <Pill tone="sand">{checkInLabel(plant)}</Pill>
+                      )}
                       {trend !== 0 && (
                         <Pill tone={trend > 0 ? "palm" : "clay"}>
                           {trend > 0 ? (

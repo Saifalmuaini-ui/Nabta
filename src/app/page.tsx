@@ -14,11 +14,16 @@ import {
 import { Card } from "@/components/ui";
 import AlertsFeed from "@/components/AlertsFeed";
 import { useStore } from "@/lib/store";
+import { totalPending } from "@/lib/growth";
 import { COMMUNITY_IMPACT, REWARDS, SEED_LEADERS } from "@/lib/data";
 import { compact, kg, litres, num } from "@/lib/format";
 
 export default function HomePage() {
-  const { profile, points, lifetimePoints, streak, totals, ready } = useStore();
+  const { profile, points, lifetimePoints, streak, totals, plants, ready } = useStore();
+
+  // Points held against unharvested plants. Shown separately from the balance
+  // so it reads as progress rather than money you can spend.
+  const held = totalPending(plants);
 
   const nextReward =
     [...REWARDS].sort((a, b) => a.cost - b.cost).find((r) => r.cost > points) ?? REWARDS[0];
@@ -59,6 +64,11 @@ export default function HomePage() {
             <p className="tnum mt-1 text-3xl font-semibold leading-none text-ink">
               {ready ? num(points) : "—"}
             </p>
+            {held > 0 && (
+              <p className="mt-1.5 text-xs text-gold-600">
+                {num(held)} held until you harvest
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-5">
             <div className="text-end">

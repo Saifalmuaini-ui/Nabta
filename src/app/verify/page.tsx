@@ -17,6 +17,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { Bar, Card, cx, DemoNote, PageHeader, Pill, SectionTitle } from "@/components/ui";
+import { CHECK_IN_PENDING } from "@/lib/growth";
 import { useStore } from "@/lib/store";
 import { makeSamplePhoto } from "@/lib/samplePhoto";
 import { loadSamplePhoto, randomSample } from "@/lib/samplePhotos";
@@ -55,7 +56,10 @@ export default function VerifyPage() {
   const [phase, setPhase] = useState<Phase>("setup");
   const [image, setImage] = useState<string>("");
   const [stageIndex, setStageIndex] = useState(0);
-  const [draft, setDraft] = useState<VerificationDraft | null>(null);
+  // points and cycle come back from the store, which owns the economy.
+  const [draft, setDraft] = useState<
+    (VerificationDraft & Pick<Verification, "cycle">) | null
+  >(null);
   const [cameraError, setCameraError] = useState<string>("");
   const [shareLocation, setShareLocation] = useState(true);
 
@@ -179,7 +183,15 @@ export default function VerifyPage() {
         : undefined;
 
     const stored = addVerification(record, upsert);
-    setDraft({ ...result, plantId: stored.plantId, plantIsNew: stored.plantIsNew });
+    setDraft({
+      ...result,
+      plantId: stored.plantId,
+      plantIsNew: stored.plantIsNew,
+      // The store decides what a capture is worth, so take its numbers.
+      points: stored.points,
+      breakdown: stored.breakdown,
+      cycle: stored.cycle,
+    });
     setPhase("result");
   }, [image, verifications, plants, addVerification, shareLocation]);
 
@@ -197,7 +209,7 @@ export default function VerifyPage() {
         eyebrow="AI verification"
         title="Log your work"
         arabic="وثّق عملك"
-        subtitle="Photograph what you did in the garden. Nothing to fill in, the model reads the activity and the species off the photo, scores plant health, screens for duplicates, and releases the points."
+        subtitle="Photograph what you did in the garden. Nothing to fill in, the model reads the activity and the species off the photo, scores plant health, screens for duplicates, and advances the plant's grow cycle."
       />
 
       {phase === "setup" && (
@@ -492,7 +504,7 @@ function ResultView({
   image,
   onAgain,
 }: {
-  draft: VerificationDraft;
+  draft: VerificationDraft & Pick<Verification, "cycle">;
   image: string;
   onAgain: () => void;
 }) {
@@ -574,14 +586,56 @@ function ResultView({
                 <Pill tone="sand">{Math.round(draft.confidence * 100)}% confidence</Pill>
               </div>
             </div>
+            {/*
+              A capture pays nothing on its own now. Showing "+0" would read as
+              a failure, so the held amount is shown instead and the balance
+              figure only appears when a cycle actually released.
+            */}
             <div className="shrink-0 text-end">
-              <p className="tnum text-3xl font-semibold text-palm-600">
-                +{draft.points}
-              </p>
-              <p className="text-xs text-ink-faint">points</p>
+              {draft.points > 0 ? (
+                <>
+                  <p className="tnum text-3xl font-semibold text-palm-600">
+                    +{draft.points}
+                  </p>
+                  <p className="text-xs text-ink-faint">points released</p>
+                </>
+              ) : draft.cycle?.kind === "checkin" ? (
+                <>
+                  <p className="tnum text-3xl font-semibold text-gold-600">
+                    +{CHECK_IN_PENDING}
+                  </p>
+                  <p className="text-xs text-ink-faint">held till harvest</p>
+                </>
+              ) : (
+                <>
+                  <p className="tnum text-2xl font-semibold text-ink-faint">—</p>
+                  <p className="text-xs text-ink-faint">logged</p>
+                </>
+              )}
             </div>
           </div>
         </Card>
+
+        {draft.cycle && (
+          <Card
+            className={
+              draft.cycle.kind === "harvest"
+                ? "border-palm-200 bg-palm-50 p-5"
+                : "border-sand-200 p-5"
+            }
+          >
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-faint">
+              {draft.cycle.kind === "harvest"
+                ? "Cycle complete"
+                : draft.cycle.kind === "planted"
+                  ? "Cycle started"
+                  : draft.cycle.kind === "checkin"
+                    ? "Weekly check-in"
+                    : "Logged"}
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-ink">{draft.cycle.message}</p>
+          </Card>
+        )}
 
         {draft.plantIsNew !== undefined && (
           <Card
@@ -696,7 +750,7 @@ function ResultView({
 
         {draft.breakdown.length > 0 && (
           <Card className="p-5">
-            <SectionTitle>How the points were calculated</SectionTitle>
+            <SectionTitle>What this capture earned</SectionTitle>
             <ul className="divide-y divide-sand-200 text-sm">
               {draft.breakdown.map((line) => (
                 <li key={line.label} className="flex justify-between py-2.5">

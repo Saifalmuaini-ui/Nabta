@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -20,6 +21,13 @@ import type {
   Verification,
 } from "./types";
 import { streakInfo } from "./verifier";
+import {
+  CHECK_IN_PENDING,
+  HARVEST_BONUS,
+  evaluateCapture,
+  streakWeeks,
+  weeklyStreakPoints,
+} from "./growth";
 
 const KEY = "nabta.state.v1";
 const DAY = 86_400_000;
@@ -148,6 +156,14 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<Persisted>(defaultState);
   const [ready, setReady] = useState(false);
 
+  // addVerification has to read the current plants to score a capture, and the
+  // state updater must stay pure. A ref gives it a clean read of the latest
+  // plants without reaching into the updater.
+  const plantsRef = useRef(state.plants);
+  plantsRef.current = state.plants;
+  const verificationsRef = useRef(state.verifications);
+  verificationsRef.current = state.verifications;
+
   // Load after mount so server and first client render agree.
   useEffect(() => {
     try {
@@ -208,9 +224,59 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         };
       }
 
-      const stored: Verification = upsert
-        ? { ...v, plantId, plantIsNew: Boolean(created) }
-        : v;
+      // What this capture is worth is decided against the plant's grow cycle,
+      // not by the verifier. A photo on its own pays nothing: points accrue in
+      // escrow on the plant and are released when it is harvested.
+      const existing = plantId ? plantsRef.current.find((p) => p.id === plantId) ?? null : null;
+      const outcome = evaluateCapture(created ? null : existing, v, v.createdAt);
+
+      // The habit bonus is paid at release rather than dripped per photo, so a
+      // long streak cannot become the main source of points on its own.
+      const weeks = streakWeeks(verificationsRef.current);
+      const streakBonus = outcome.released > 0 ? weeklyStreakPoints(weeks) : 0;
+      const releasedTotal = outcome.released + streakBonus;
+
+      // One breakdown, built from what actually happened to the cycle, so the
+      // result screen can never show points the balance did not receive.
+      const breakdown =
+        outcome.kind === "harvest"
+          ? [
+              { label: "Held from weekly check-ins", points: outcome.released - HARVEST_BONUS },
+              { label: "Completed grow cycle", points: HARVEST_BONUS },
+              ...(streakBonus > 0
+                ? [
+                    {
+                      label: `${Math.min(weeks, 4)} week streak`,
+                      points: streakBonus,
+                    },
+                  ]
+                : []),
+            ]
+          : outcome.kind === "checkin"
+            ? [{ label: "Check-in, held until harvest", points: CHECK_IN_PENDING }]
+            : [];
+
+      const stored: Verification = {
+        ...v,
+        ...(upsert ? { plantId, plantIsNew: Boolean(created) } : {}),
+        // The balance only ever moves by what was actually released.
+        points: releasedTotal,
+        breakdown,
+        cycle: {
+          kind: outcome.kind,
+          pendingDelta: outcome.pendingDelta,
+          released: releasedTotal,
+          message: outcome.message,
+          nextCheckInAt: outcome.nextCheckInAt,
+        },
+      };
+
+      if (created) {
+        created.checkIns = 1;
+        created.pendingPoints = 0;
+        created.lastCheckInAt = v.createdAt;
+        created.cyclesCompleted = 0;
+      }
 
       setState((s) => {
         const plants = created
@@ -228,6 +294,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
                       ...p.history,
                       { at: v.createdAt, score: upsert?.healthScore ?? 0 },
                     ].slice(-60),
+                    checkIns: (p.checkIns ?? 0) + (outcome.countsAsCheckIn ? 1 : 0),
+                    pendingPoints: Math.max(0, (p.pendingPoints ?? 0) + outcome.pendingDelta),
+                    lastCheckInAt: outcome.countsAsCheckIn ? v.createdAt : p.lastCheckInAt,
+                    // A completed cycle resets the plant so a perennial can be
+                    // grown and harvested again rather than being finished.
+                    ...(outcome.kind === "harvest"
+                      ? {
+                          checkIns: 0,
+                          lastCheckInAt: v.createdAt,
+                          cyclesCompleted: (p.cyclesCompleted ?? 0) + 1,
+                        }
+                      : {}),
                   }
                 : p,
             );
@@ -236,8 +314,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           ...s,
           plants: trimPlants(plants),
           verifications: trim([stored, ...s.verifications]),
-          points: s.points + stored.points,
-          lifetimePoints: s.lifetimePoints + stored.points,
+          points: s.points + releasedTotal,
+          lifetimePoints: s.lifetimePoints + releasedTotal,
         };
       });
 
